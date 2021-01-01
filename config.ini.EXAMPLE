@@ -1,0 +1,11 @@
+[main]
+ip_net_prefix: 192.168.2
+
+[proxmox]
+proxmox_url: https://proxmox-server:8006
+proxmox_token_name: api-user@pam!main 
+proxmox_token: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+[cloudflare]
+cloudflare_token: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cloudflare_zone: mydomain.net

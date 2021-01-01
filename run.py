@@ -11,15 +11,16 @@ from configparser import ConfigParser
 
 
 class Proxmox:
-    def __init__(self, proxmox_url, proxmox_token_name, proxmox_token, ip_net_prefix):
+    def __init__(self, proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix):
         self.proxmox_url = proxmox_url
+        self.proxmox_node_name = proxmox_node_name
         self.proxmox_token = f"PVEAPIToken={proxmox_token_name}={proxmox_token}"
         self.ip_net_prefix = ip_net_prefix
 
     def get_vms(self):
         """get vms from proxmox server"""
         try:
-            r = requests.get(f"{self.proxmox_url}/api2/json/nodes/pve/qemu", headers={"Authorization": self.proxmox_token}, verify=False)
+            r = requests.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu", headers={"Authorization": self.proxmox_token}, verify=False)
             r.raise_for_status()
             vms = json.loads(r.text)
 
@@ -53,10 +54,13 @@ class Proxmox:
     def _get_ip(self, vmid):
         """get ip address for vmid"""
         try:
-            r = requests.get(f"{self.proxmox_url}/api2/json/nodes/pve/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify=False)
+            r = requests.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify=False)
             r.raise_for_status()
             results = json.loads(r.text)['data']['result']
         except Exception as ex:
+            return False
+
+        if 'error' in results:
             return False
 
         for interface in results:
@@ -149,6 +153,7 @@ try:
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')
+    proxmox_node_name = config.get('proxmox', 'proxmox_node_name')
     cloudflare_token = config.get('cloudflare', 'cloudflare_token')
     cloudflare_zone = config.get('cloudflare', 'cloudflare_zone')
 except FileNotFoundError as err:
@@ -158,7 +163,7 @@ except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
     exit()
 
-proxmox = Proxmox(proxmox_url, proxmox_token_name, proxmox_token, ip_net_prefix)
+proxmox = Proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix)
 cf = Cloudflare(cloudflare_token, cloudflare_zone)
 
 vms = proxmox.get_vms()

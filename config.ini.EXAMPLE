@@ -10,5 +10,5 @@ proxmox_token: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 [cloudflare]
 cloudflare_token: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 cloudflare_zone: mydomain.net
-cloudflare_dns_prefix: nyc #optional
+cloudflare_dns_subdomain: nyc #optional
 

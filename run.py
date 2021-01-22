@@ -156,7 +156,7 @@ try:
     proxmox_node_name = config.get('proxmox', 'proxmox_node_name')
     cloudflare_token = config.get('cloudflare', 'cloudflare_token')
     cloudflare_zone = config.get('cloudflare', 'cloudflare_zone')
-    cloudflare_dns_subdomain = config.get('cloudflare', 'cloudflare_dns_subdomain')
+    cloudflare_dns_subdomain = config.get('cloudflare', 'cloudflare_dns_subdomain', fallback=None)
 except FileNotFoundError as err:
     logging.exception(f"Unable to read config file! Error: {err}")
     exit()
@@ -174,9 +174,10 @@ if vms:
         try:
             if cloudflare_dns_subdomain:
                 cf.update_record(f"{vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone}", vm['ip_address'])
+                logging.info(f"Updated or created record for {vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone} ({vm['ip_address']})")
             else:
                 cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])
-            logging.info(f"Updated or created record for {vm['name']}.{cloudflare_zone} ({vm['ip_address']})")
+                logging.info(f"Updated or created record for {vm['name']}.{cloudflare_zone} ({vm['ip_address']})")
         except Exception as err:
             logging.error(f"Failed to update record for {vm['name']}.{cloudflare_zone}")
 else:

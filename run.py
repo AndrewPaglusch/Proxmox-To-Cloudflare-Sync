@@ -156,7 +156,7 @@ try:
     proxmox_node_name = config.get('proxmox', 'proxmox_node_name')
     cloudflare_token = config.get('cloudflare', 'cloudflare_token')
     cloudflare_zone = config.get('cloudflare', 'cloudflare_zone')
-    cloudflare_dns_subdomain = config.get('cloudflare', 'cloudflare_dns_subdomain')
+    cloudflare_dns_subdomain = config.get('cloudflare', 'cloudflare_dns_subdomain', fallback=None)
 except FileNotFoundError as err:
     logging.exception(f"Unable to read config file! Error: {err}")
     exit()

@@ -77,7 +77,7 @@ class Cloudflare:
 
     def update_record(self, record_name, ip_address):
 
-        if not self.zone_id:
+        if not getattr(self, 'zone_id', None):
             self.zone_id = self._lookup_zone_id()
 
         if not self.zone_id:

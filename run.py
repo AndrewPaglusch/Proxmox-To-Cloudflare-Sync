@@ -174,9 +174,10 @@ if vms:
         try:
             if cloudflare_dns_subdomain:
                 cf.update_record(f"{vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone}", vm['ip_address'])
+                logging.info(f"Updated or created record for {vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone} ({vm['ip_address']})")
             else:
                 cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])
-            logging.info(f"Updated or created record for {vm['name']}.{cloudflare_zone} ({vm['ip_address']})")
+                logging.info(f"Updated or created record for {vm['name']}.{cloudflare_zone} ({vm['ip_address']})")
         except Exception as err:
             logging.error(f"Failed to update record for {vm['name']}.{cloudflare_zone}")
 else:

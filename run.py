@@ -34,8 +34,8 @@ class Proxmox:
                 else:
                     ip_address = f"{self.ip_net_prefix}.{vmid}"
                     logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {ip_address}")
-    
-                vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
+
+                vm['ip_address'] = ip_address
             return vms
     
         except Exception as err:

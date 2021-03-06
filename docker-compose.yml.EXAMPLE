@@ -13,4 +13,5 @@ services:
       CLOUDFLARE_TOKEN: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       CLOUDFLARE_ZONE: mydomain.net
       CLOUDFLARE_DNS_SUBDOMAIN: nyc #optional
+      INTERVAL: 1h #optional, default in container is 1h.
  

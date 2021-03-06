@@ -5,12 +5,12 @@ services:
     container_name: proxmox-cloudflare-sync
     restart: always
     environment:
-      IP_NET_PREFIX: ${IP_NET_PREFIX}
-      PROXMOX_URL: ${PROXMOX_URL}
-      PROXMOX_NODE_NAME: ${PROXMOX_NODE_NAME}
-      PROXMOX_TOKEN_NAME: ${PROXMOX_TOKEN_NAME} 
-      PROXMOX_TOKEN: ${PROXMOX_TOKEN}
-      CLOUDFLARE_TOKEN: ${CLOUDFLARE_TOKEN}
-      CLOUDFLARE_ZONE: ${CLOUDFLARE_ZONE}
-      CLOUDFLARE_DNS_SUBDOMAIN: ${CLOUDFLARE_DNS_SUBDOMAIN}
+      IP_NET_PREFIX: 192.168.2
+      PROXMOX_URL: https://proxmox-server:8006
+      PROXMOX_NODE_NAME: pve
+      PROXMOX_TOKEN_NAME: api-user@pam!main
+      PROXMOX_TOKEN: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      CLOUDFLARE_TOKEN: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      CLOUDFLARE_ZONE: mydomain.net
+      CLOUDFLARE_DNS_SUBDOMAIN: nyc #optional
  

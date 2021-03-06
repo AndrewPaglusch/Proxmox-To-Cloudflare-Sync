@@ -1,0 +1,16 @@
+version: "3.5"
+services:
+  proxmox-cloudflare-sync:
+    build: .
+    container_name: proxmox-cloudflare-sync
+    restart: always
+    environment:
+      IP_NET_PREFIX: ${IP_NET_PREFIX}
+      PROXMOX_URL: ${PROXMOX_URL}
+      PROXMOX_NODE_NAME: ${PROXMOX_NODE_NAME}
+      PROXMOX_TOKEN_NAME: ${PROXMOX_TOKEN_NAME} 
+      PROXMOX_TOKEN: ${PROXMOX_TOKEN}
+      CLOUDFLARE_TOKEN: ${CLOUDFLARE_TOKEN}
+      CLOUDFLARE_ZONE: ${CLOUDFLARE_ZONE}
+      CLOUDFLARE_DNS_SUBDOMAIN: ${CLOUDFLARE_DNS_SUBDOMAIN}
+      

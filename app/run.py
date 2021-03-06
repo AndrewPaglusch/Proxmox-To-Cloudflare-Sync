@@ -37,7 +37,7 @@ class Proxmox:
 
                 vm['ip_address'] = ip_address
             return vms
-    
+
         except Exception as err:
             logging.exception('Error while getting VM list from Proxmox')
             return False
@@ -46,11 +46,11 @@ class Proxmox:
         """remove templates and other unneeded info from vm list"""
         # remove templates from list so we only have vms
         no_templates = [d for d in vms if d['template'] != 1]
-        
+
         # remove everything except name and vmid from each dict in list
         filtered = [{k:v for k,v in d.items() if k in ('name', 'vmid')} for d in no_templates]
         return filtered
-    
+
     def _get_ip(self, vmid):
         """get ip address for vmid"""
         try:

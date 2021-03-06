@@ -15,4 +15,4 @@ COPY /app/ /app/
 # Install python dependencies
 RUN pip install -r requirements.txt
 
-ENTRYPOINT ["/bin/ash", "/app/run.sh"]
+ENTRYPOINT ["/bin/ash", "/app/entrypoint.sh"]

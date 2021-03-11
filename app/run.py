@@ -110,18 +110,16 @@ class Cloudflare:
     async def update_record(self, record_name, ip_address):
         """update record with given ip address"""
 
-        # see if the record is already in clouflare how we want it
+        # see if the record is already in zone how we want it
         if record_name in self.zone_records.keys():
-            if self.zone_records[record_name] == ip_address:
+            if self.zone_records[record_name]['ip_address'] == ip_address:
                 logging.info(f"Skipping update of {record_name}. It is already in desired state")
                 return
 
         async with aiohttp.ClientSession() as session:
-            record_id = await self._lookup_record_id(session, record_name)
-            # TODO: Improve upon this. We already have all records and their ids in self.zone_records if they exist
-            # There's no need to look the record_id up again if we dont need to
-            if record_id:
-                if await self._update_record(session, record_name, record_id, ip_address):
+            # do we need to update a record, or create a new one?
+            if record_name in self.zone_records.keys():
+                if await self._update_record(session, record_name, self.zone_records[record_name]['record_id'], ip_address):
                     logging.info(f"Updated record for {record_name} ({ip_address})")
                 else:
                     raise Exception(f"Failed to update record {record_name}")
@@ -148,26 +146,11 @@ class Cloudflare:
             async with session.get(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records?type=A", headers={"Authorization": f"Bearer {self.cloudflare_token}"}) as r:
                 r.raise_for_status()
                 records = json.loads(await r.text())['result']
-                records = { records[i]['name']:records[i]['content'] for i in range(0, len(records)) }
+                records = { records[i]['name']:{ 'ip_address': records[i]['content'], 'record_id': records[i]['id'] } for i in range(0, len(records)) }
                 logging.debug(f"Records lookup completed. Found {len(records)} records")
                 return records
         except Exception:
             logging.exception("Failed to retreive records for zone {self.cloudflare_zone_name}")
-
-    async def _lookup_record_id(self, session, record_name):
-        """lookup A record and return record ID if exists or False if it doesnt"""
-        try:
-            async with session.get(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records?name={record_name}", headers={"Authorization": f"Bearer {self.cloudflare_token}"}) as r:
-                r.raise_for_status()
-                response = json.loads(await r.text())
-                if len(response['result']) == 0:
-                    logging.debug(f"Record for {record_name} not found")
-                    return False
-                record_id = response['result'][0]['id']
-                logging.debug(f"Record {record_name} has record ID {record_id}")
-                return record_id
-        except Exception:
-            logging.exception(f"Failed to look up record id for {record_name} or it does not exist")
 
     async def _create_record(self, session, record_name, ip_address):
         """create A record and return record id"""

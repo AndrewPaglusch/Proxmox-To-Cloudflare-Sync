@@ -3,8 +3,9 @@
 import sys
 import os
 import requests
+import asyncio
+import aiohttp
 import json
-import time
 import logging
 import urllib3
 from configparser import ConfigParser
@@ -75,71 +76,86 @@ class Cloudflare:
         self.cloudflare_token = cloudflare_token
         self.cloudflare_zone_name = cloudflare_zone_name
 
-    def update_record(self, record_name, ip_address):
+    async def update_record(self, record_name, ip_address):
+        async with aiohttp.ClientSession() as session:
+            if not getattr(self, 'zone_id', None):
+                self.zone_id = await self._lookup_zone_id(session)
 
-        if not getattr(self, 'zone_id', None):
-            self.zone_id = self._lookup_zone_id()
+            if not self.zone_id:
+                raise Exception("Failed to look up zone id")
 
-        if not self.zone_id:
-            raise Exception("Failed to look up zone id")
+            record_id = await self._lookup_record_id(session, record_name)
+            if record_id:
+                if await self._update_record(session, record_name, record_id, ip_address):
+                    logging.info(f"Updated record for {record_name} ({ip_address})")
+                else:
+                    raise Exception("Failed to update record")
+            else:
+                if await self._create_record(session, record_name, ip_address):
+                    logging.info(f"Created record for {record_name} ({ip_address})")
+                else:
+                    raise Exception("Failed to create record")
 
-        record_id = self._lookup_record_id(record_name)
-        if record_id:
-            if not self._update_record(record_name, record_id, ip_address):
-                raise Exception("Failed to update record")
-        else:
-            if not self._create_record(record_name, ip_address):
-                raise Exception("Failed to create record")
-
-    def _lookup_zone_id(self):
+    async def _lookup_zone_id(self, session):
         """lookup zone id given zone name"""
         try:
-            r = requests.get(f"https://api.cloudflare.com/client/v4/zones?name={self.cloudflare_zone_name}", headers={"Authorization": f"Bearer {self.cloudflare_token}"})
-            r.raise_for_status()
-            zone_id = json.loads(r.text)['result'][0]['id']
-            logging.debug(f"Zone ID lookup finished: {zone_id}")
-            return zone_id
+            async with session.get(f"https://api.cloudflare.com/client/v4/zones?name={self.cloudflare_zone_name}", headers={"Authorization": f"Bearer {self.cloudflare_token}"}) as r:
+                r.raise_for_status()
+                zone_id = json.loads(await r.text())['result'][0]['id']
+                logging.debug(f"Zone ID lookup finished: {zone_id}")
+                return zone_id
         except Exception:
             logging.exception("Failed to look up zone id")
 
-    def _lookup_record_id(self, record_name):
+    async def _lookup_record_id(self, session, record_name):
         """lookup A record and return record ID if exists or False if it doesnt"""
         try:
-            r = requests.get(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records?name={record_name}", headers={"Authorization": f"Bearer {self.cloudflare_token}"})
-            r.raise_for_status()
-            response = json.loads(r.text)
-            if len(response['result']) == 0:
-                logging.debug(f"Record for {record_name} not found")
-                return False
-            record_id = response['result'][0]['id']
-            logging.debug(f"Record {record_name} has record ID {record_id}")
-            return record_id
+            async with session.get(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records?name={record_name}", headers={"Authorization": f"Bearer {self.cloudflare_token}"}) as r:
+                r.raise_for_status()
+                response = json.loads(await r.text())
+                if len(response['result']) == 0:
+                    logging.debug(f"Record for {record_name} not found")
+                    return False
+                record_id = response['result'][0]['id']
+                logging.debug(f"Record {record_name} has record ID {record_id}")
+                return record_id
         except Exception:
             logging.exception(f"Failed to look up record id for {record_name} or it does not exist")
 
-    def _create_record(self, record_name, ip_address):
+    async def _create_record(self, session, record_name, ip_address):
         """create A record and return record id"""
         try:
             payload = {"type": "A", "name": record_name, "content": ip_address, "ttl": 120, "priority": 10, "proxied": False}
-            r = requests.post(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records", headers={"Authorization": f"Bearer {self.cloudflare_token}"}, json=payload)
-            r.raise_for_status()
-            record_id = json.loads(r.text)['result']['id']
-            logging.debug(f"Record {record_name} created with {ip_address} record ID {record_id}")
-            return record_id
+            async with session.post(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records", headers={"Authorization": f"Bearer {self.cloudflare_token}"}, json=payload) as r:
+                r.raise_for_status()
+                record_id = json.loads(await r.text())['result']['id']
+                logging.debug(f"Record {record_name} created with {ip_address} record ID {record_id}")
+                return record_id
         except Exception:
             logging.exception(f"Failed to create record for {record_name} ({ip_address})")
 
-    def _update_record(self, record_name, record_id, ip_address):
+    async def _update_record(self, session, record_name, record_id, ip_address):
         """update A record and return record id"""
         try:
             payload = {"type": "A", "name": record_name, "content": ip_address, "ttl": 120, "priority": 10, "proxied": False}
-            r = requests.put(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records/{record_id}", headers={"Authorization": f"Bearer {self.cloudflare_token}"}, json=payload)
-            r.raise_for_status()
-            record_id = json.loads(r.text)['result']['id']
-            logging.debug(f"Record {record_name} updated to {ip_address} record ID {record_id}")
-            return record_id
+            async with session.put(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records/{record_id}", headers={"Authorization": f"Bearer {self.cloudflare_token}"}, json=payload) as r:
+                r.raise_for_status()
+                record_id = json.loads(await r.text())['result']['id']
+                logging.debug(f"Record {record_name} updated to {ip_address} record ID {record_id}")
+                return record_id
         except Exception:
             logging.exception(f"Failed to update record for {record_name} ({ip_address})")
+
+async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms):
+    cf = Cloudflare(cloudflare_token, cloudflare_zone)
+    tasks = []
+    for vm in vms:
+        if cloudflare_dns_subdomain:
+            tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone}", vm['ip_address'])))
+        else:
+            tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])))
+    await asyncio.gather(*tasks)
+
 
 # hide SSL/TLS warnings
 urllib3.disable_warnings()
@@ -167,20 +183,9 @@ except Exception as err:
     exit()
 
 proxmox = Proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix)
-cf = Cloudflare(cloudflare_token, cloudflare_zone)
 
 vms = proxmox.get_vms()
-#vms = [vms[0]] ## DEBUG
 if vms:
-    for vm in vms:
-        try:
-            if cloudflare_dns_subdomain:
-                cf.update_record(f"{vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone}", vm['ip_address'])
-                logging.info(f"Updated or created record for {vm['name']}.{cloudflare_dns_subdomain}.{cloudflare_zone} ({vm['ip_address']})")
-            else:
-                cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])
-                logging.info(f"Updated or created record for {vm['name']}.{cloudflare_zone} ({vm['ip_address']})")
-        except Exception as err:
-            logging.error(f"Failed to update record for {vm['name']}.{cloudflare_zone}")
+    asyncio.run(sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms))
 else:
     logging.critical("Unable to get VM list from Proxmox")

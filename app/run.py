@@ -2,7 +2,6 @@
 
 import sys
 import os
-import requests
 import asyncio
 import aiohttp
 import json

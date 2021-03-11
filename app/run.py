@@ -18,26 +18,36 @@ class Proxmox:
         self.proxmox_token = f"PVEAPIToken={proxmox_token_name}={proxmox_token}"
         self.ip_net_prefix = ip_net_prefix
 
-    def get_vms(self):
+    async def get_vms(self):
         """get vms from proxmox server"""
         try:
             r = requests.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu", headers={"Authorization": self.proxmox_token}, verify=False)
             r.raise_for_status()
             vms = json.loads(r.text)
-
             vms = self._filter_vms(vms['data'])
-            for vm in vms:
-                vmid = vm['vmid']
 
-                ip_address = self._get_ip(vmid)
-                if ip_address:
-                    logging.info(f"IP address for {vmid} is {ip_address}")
-                else:
-                    ip_address = f"{self.ip_net_prefix}.{vmid}"
-                    logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {ip_address}")
+            async with aiohttp.ClientSession() as session:
+                tasks = [ asyncio.create_task(self.get_vm_ip(session, vm)) for vm in vms ]
+                return await asyncio.gather(*tasks)
 
-                vm['ip_address'] = ip_address
-            return vms
+        except Exception as err:
+            logging.exception('Error while getting VM list from Proxmox')
+            return False
+
+    async def get_vm_ip(self, session, vm):
+        """get vms from proxmox server"""
+        try:
+           vmid = vm['vmid']
+
+           ip_address = await self._get_ip(session, vmid)
+           if ip_address:
+               logging.info(f"IP address for {vmid} is {ip_address}")
+           else:
+               ip_address = f"{self.ip_net_prefix}.{vmid}"
+               logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {ip_address}")
+
+           vm['ip_address'] = ip_address
+           return vm
 
         except Exception as err:
             logging.exception('Error while getting VM list from Proxmox')
@@ -52,12 +62,12 @@ class Proxmox:
         filtered = [{k:v for k,v in d.items() if k in ('name', 'vmid')} for d in no_templates]
         return filtered
 
-    def _get_ip(self, vmid):
+    async def _get_ip(self, session, vmid):
         """get ip address for vmid"""
         try:
-            r = requests.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify=False)
-            r.raise_for_status()
-            results = json.loads(r.text)['data']['result']
+            async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
+                r.raise_for_status()
+                results = json.loads(await r.text())['data']['result']
         except Exception as ex:
             return False
 
@@ -156,6 +166,10 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
             tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])))
     await asyncio.gather(*tasks)
 
+async def pull_from_proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix):
+    proxmox = Proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix)
+    return await proxmox.get_vms()
+
 
 # hide SSL/TLS warnings
 urllib3.disable_warnings()
@@ -182,9 +196,7 @@ except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
     exit()
 
-proxmox = Proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix)
-
-vms = proxmox.get_vms()
+vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix))
 if vms:
     asyncio.run(sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms))
 else:

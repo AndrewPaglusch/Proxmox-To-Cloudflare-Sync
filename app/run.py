@@ -21,12 +21,14 @@ class Proxmox:
     async def get_vms(self):
         """get vms from proxmox server"""
         try:
-            r = requests.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu", headers={"Authorization": self.proxmox_token}, verify=False)
-            r.raise_for_status()
-            vms = json.loads(r.text)
-            vms = self._filter_vms(vms['data'])
-
             async with aiohttp.ClientSession() as session:
+                # get all vms from proxmox
+                async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
+                    r.raise_for_status()
+                    vms = json.loads(await r.text())
+                    vms = self._filter_vms(vms['data'])
+
+                # get ip address for each vm
                 tasks = [ asyncio.create_task(self.get_vm_ip(session, vm)) for vm in vms ]
                 return await asyncio.gather(*tasks)
 
@@ -37,21 +39,48 @@ class Proxmox:
     async def get_vm_ip(self, session, vm):
         """get vms from proxmox server"""
         try:
-           vmid = vm['vmid']
+            vmid = vm['vmid']
 
-           ip_address = await self._get_ip(session, vmid)
-           if ip_address:
-               logging.info(f"IP address for {vmid} is {ip_address}")
-           else:
-               ip_address = f"{self.ip_net_prefix}.{vmid}"
-               logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {ip_address}")
+            # get nic info for vm
+            nic_info = await self.get_vm_nics(session, vmid)
 
-           vm['ip_address'] = ip_address
-           return vm
+            # get ip address from nic info
+            ip_address = self.get_ip_from_nics(nic_info)
+
+            # did we find the ip address, or should we predict it?
+            if ip_address:
+                vm['ip_address'] = ip_address
+                logging.info(f"IP address for {vmid} is {vm['ip_address']}")
+            else:
+                vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
+                logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {vm['ip_address']}")
+
+            return vm
 
         except Exception as err:
-            logging.exception('Error while getting VM list from Proxmox')
+            logging.exception(f'Error while getting IP address for {vmid}')
             return False
+
+    async def get_vm_nics(self, session, vmid):
+        try:
+            async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
+                r.raise_for_status()
+                return json.loads(await r.text())['data']['result']
+        except Exception as ex:
+            return False
+
+        if 'error' in results:
+            return False
+
+    def get_ip_from_nics(self, nic_info):
+        # look for ip address beginning with ip_net_prefix
+        if nic_info:
+            for interface in nic_info:
+                for ip_address_type in interface["ip-addresses"]:
+                    if ip_net_prefix in ip_address_type['ip-address']:
+                        return ip_address_type['ip-address']
+        return False
+
 
     def _filter_vms(self, vms):
         """remove templates and other unneeded info from vm list"""
@@ -61,24 +90,6 @@ class Proxmox:
         # remove everything except name and vmid from each dict in list
         filtered = [{k:v for k,v in d.items() if k in ('name', 'vmid')} for d in no_templates]
         return filtered
-
-    async def _get_ip(self, session, vmid):
-        """get ip address for vmid"""
-        try:
-            async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
-                r.raise_for_status()
-                results = json.loads(await r.text())['data']['result']
-        except Exception as ex:
-            return False
-
-        if 'error' in results:
-            return False
-
-        for interface in results:
-            for ip_address_type in interface["ip-addresses"]:
-                if ip_net_prefix in ip_address_type['ip-address']:
-                    return ip_address_type['ip-address']
-        return False
 
 
 class Cloudflare:

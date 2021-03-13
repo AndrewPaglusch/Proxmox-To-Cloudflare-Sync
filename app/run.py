@@ -5,7 +5,6 @@ import os
 import asyncio
 import aiohttp
 import json
-from pprint import pprint
 import logging
 import urllib3
 from configparser import ConfigParser

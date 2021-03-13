@@ -42,9 +42,9 @@ class Proxmox:
 
             # get nic info for vm
             nic_info = await self.get_vm_nics(session, vmid)
-
-            # get ip address from nic info
-            ip_address = self.get_ip_from_nics(nic_info)
+            if nic_info:
+                # get ip address from nic info
+                ip_address = self.get_ip_from_nics(nic_info)
 
             # did we find the ip address, or should we predict it?
             if ip_address:

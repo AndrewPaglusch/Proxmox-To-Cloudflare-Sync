@@ -65,11 +65,13 @@ class Proxmox:
         try:
             async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
                 r.raise_for_status()
-                return json.loads(await r.text())['data']['result']
-        except Exception as ex:
-            return False
 
-        if 'error' in results:
+                if 'error' in results:
+                    return False
+
+                return json.loads(await r.text())['data']['result']
+
+        except Exception as ex:
             return False
 
     def get_ip_from_nics(self, nic_info):

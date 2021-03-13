@@ -65,11 +65,12 @@ class Proxmox:
         try:
             async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
                 r.raise_for_status()
+                results = json.loads(await r.text())
 
                 if 'error' in results:
                     return False
 
-                return json.loads(await r.text())['data']['result']
+                return results['data']['result']
 
         except Exception as ex:
             return False

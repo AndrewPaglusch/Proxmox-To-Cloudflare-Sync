@@ -107,6 +107,8 @@ class Cloudflare:
             if not self.zone_records:
                 return False
 
+            return True
+
     async def update_record(self, record_name, ip_address):
         """update record with given ip address"""
         # see if the record is already in zone how we want it

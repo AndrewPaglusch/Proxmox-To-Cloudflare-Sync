@@ -29,7 +29,11 @@ class Proxmox:
 
                 # get ip address for each vm
                 tasks = [ asyncio.create_task(self.get_vm_ip(session, vm)) for vm in vms ]
-                return await asyncio.gather(*tasks)
+                vms = await asyncio.gather(*tasks)
+
+                # remove None items from list
+                vms = [ i for i in vms if i is not None ]
+                return vms
 
         except Exception as err:
             logging.exception('Error while getting VM list from Proxmox')
@@ -52,8 +56,12 @@ class Proxmox:
                 vm['ip_address'] = ip_address
                 logging.info(f"IP address for {vmid} is {vm['ip_address']}")
             else:
-                vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
-                logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {vm['ip_address']}")
+                if int(vmid) > 254:
+                    logging.info(f"Unable to lookup IP address for {vmid}. Not generating a predicted address because the ID ({vmid}) is greater than 254")
+                    return
+                else:
+                    vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
+                    logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {vm['ip_address']}")
 
             return vm
 

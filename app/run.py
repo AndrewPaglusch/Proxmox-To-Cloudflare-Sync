@@ -5,6 +5,7 @@ import os
 import asyncio
 import aiohttp
 import json
+from pprint import pprint
 import logging
 import urllib3
 from configparser import ConfigParser
@@ -144,19 +145,37 @@ class Cloudflare:
     async def _get_records(self, session):
         """lookup records in zone"""
         try:
-            async with session.get(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records?type=A", headers={"Authorization": f"Bearer {self.cloudflare_token}"}) as r:
-                r.raise_for_status()
-                records = json.loads(await r.text())['result']
-                records = { records[i]['name']:{ 'ip_address': records[i]['content'], 'record_id': records[i]['id'] } for i in range(0, len(records)) }
-                logging.debug(f"Records lookup completed. Found {len(records)} records")
-                return records
+            total_pages, records = await self._get_records_page(session, 1)
+
+            if total_pages > 1:
+                for page in range(2, total_pages + 1):
+                    records.update((await self._get_records_page(session, page))[1])
+
+            logging.debug(f"Records lookup completed. Found {len(records)} total records")
+            return records
         except Exception:
             logging.exception(f"Failed to retreive records for zone {self.cloudflare_zone_name}")
+
+    async def _get_records_page(self, session, page):
+        """lookup records in zone on given page"""
+        try:
+            async with session.get(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records?type=A&per_page=100&page={page}", headers={"Authorization": f"Bearer {self.cloudflare_token}"}) as r:
+                r.raise_for_status()
+                result = json.loads(await r.text())
+                total_pages = result['result_info']['total_pages']
+
+                records = result['result']
+                records = { records[i]['name']:{ 'ip_address': records[i]['content'], 'record_id': records[i]['id'] } for i in range(0, len(records)) }
+                logging.debug(f"Records lookup completed for page {page} of {total_pages}. Found {len(records)} records")
+                return (total_pages, records)
+        except Exception:
+            logging.exception(f"Failed to retreive records for zone {self.cloudflare_zone_name} (page {page})")
 
     async def _create_record(self, session, record_name, ip_address):
         """create A record and return record id"""
         try:
             payload = {"type": "A", "name": record_name, "content": ip_address, "ttl": 120, "priority": 10, "proxied": False}
+            logging.debug(f"Sending payload to CloudFlare: {payload}")
             async with session.post(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records", headers={"Authorization": f"Bearer {self.cloudflare_token}"}, json=payload) as r:
                 r.raise_for_status()
                 record_id = json.loads(await r.text())['result']['id']

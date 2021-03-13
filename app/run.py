@@ -101,15 +101,14 @@ class Cloudflare:
         async with aiohttp.ClientSession() as session:
             self.zone_id = await self._lookup_zone_id(session)
             if not self.zone_id:
-                raise Exception(f"Failed to look up zone id for {self.cloudflare_zone_name}")
+                return False
 
             self.zone_records = await self._get_records(session)
             if not self.zone_records:
-                raise Exception(f"Failed to retreive records for {self.cloudflare_zone_name}")
+                return False
 
     async def update_record(self, record_name, ip_address):
         """update record with given ip address"""
-
         # see if the record is already in zone how we want it
         if record_name in self.zone_records.keys():
             if self.zone_records[record_name]['ip_address'] == ip_address:
@@ -121,13 +120,9 @@ class Cloudflare:
             if record_name in self.zone_records.keys():
                 if await self._update_record(session, record_name, self.zone_records[record_name]['record_id'], ip_address):
                     logging.info(f"Updated record for {record_name} ({ip_address})")
-                else:
-                    raise Exception(f"Failed to update record {record_name}")
             else:
                 if await self._create_record(session, record_name, ip_address):
                     logging.info(f"Created record for {record_name} ({ip_address})")
-                else:
-                    raise Exception(f"Failed to create record for {record_name}")
 
     async def _lookup_zone_id(self, session):
         """lookup zone id given zone name"""
@@ -138,7 +133,7 @@ class Cloudflare:
                 logging.debug(f"Zone ID lookup finished: {zone_id}")
                 return zone_id
         except Exception:
-            logging.exception("Failed to look up zone id")
+            logging.exception(f"Failed to look up zone id for {self.cloudflare_zone_name}")
 
     async def _get_records(self, session):
         """lookup records in zone"""
@@ -150,7 +145,7 @@ class Cloudflare:
                 logging.debug(f"Records lookup completed. Found {len(records)} records")
                 return records
         except Exception:
-            logging.exception("Failed to retreive records for zone {self.cloudflare_zone_name}")
+            logging.exception(f"Failed to retreive records for zone {self.cloudflare_zone_name}")
 
     async def _create_record(self, session, record_name, ip_address):
         """create A record and return record id"""
@@ -178,7 +173,10 @@ class Cloudflare:
 
 async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms):
     cf = Cloudflare(cloudflare_token, cloudflare_zone)
-    await cf.setup()
+
+    # return if we failed to get zone_id or records since everything will fail
+    if not await cf.setup():
+        return
 
     tasks = []
     for vm in vms:

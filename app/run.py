@@ -174,7 +174,6 @@ class Cloudflare:
         """create A record and return record id"""
         try:
             payload = {"type": "A", "name": record_name, "content": ip_address, "ttl": 120, "priority": 10, "proxied": False}
-            logging.debug(f"Sending payload to CloudFlare: {payload}")
             async with session.post(f"https://api.cloudflare.com/client/v4/zones/{self.zone_id}/dns_records", headers={"Authorization": f"Bearer {self.cloudflare_token}"}, json=payload) as r:
                 r.raise_for_status()
                 record_id = json.loads(await r.text())['result']['id']

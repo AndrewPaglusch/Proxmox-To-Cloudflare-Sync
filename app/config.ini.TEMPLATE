@@ -3,7 +3,7 @@ ip_net_prefix: ${IP_NET_PREFIX}
 
 [proxmox]
 proxmox_url: ${PROXMOX_URL}
-proxmox_node_name: ${PROXMOX_NODE_NAME}
+proxmox_nodes: ${PROXMOX_NODES_LIST}
 proxmox_token_name: ${PROXMOX_TOKEN_NAME} 
 proxmox_token: ${PROXMOX_TOKEN}
 

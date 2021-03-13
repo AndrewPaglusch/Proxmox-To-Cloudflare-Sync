@@ -11,9 +11,9 @@ from configparser import ConfigParser
 
 
 class Proxmox:
-    def __init__(self, proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix):
+    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix):
         self.proxmox_url = proxmox_url
-        self.proxmox_node_name = proxmox_node_name
+        self.proxmox_nodes = proxmox_nodes
         self.proxmox_token = f"PVEAPIToken={proxmox_token_name}={proxmox_token}"
         self.ip_net_prefix = ip_net_prefix
 
@@ -22,30 +22,34 @@ class Proxmox:
         try:
             async with aiohttp.ClientSession() as session:
                 # get all vms from proxmox
-                async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
-                    r.raise_for_status()
-                    vms = json.loads(await r.text())
-                    vms = self._filter_vms(vms['data'])
+                tasks = []
+                for node in self.proxmox_nodes:
+                    logging.debug(f"Retrieving VMs from node {node}...")
+                    async with session.get(f"{self.proxmox_url}/api2/json/nodes/{node}/qemu", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
+                        r.raise_for_status()
+                        response = json.loads(await r.text())
+                        vms = self._filter_vms(response['data'])
+                        tasks.extend([ asyncio.create_task(self.get_vm_ip(session, node, vm)) for vm in vms ])
+                        logging.debug(f"Found {len(vms)} VMs on node {node}")
 
                 # get ip address for each vm
-                tasks = [ asyncio.create_task(self.get_vm_ip(session, vm)) for vm in vms ]
                 vms = await asyncio.gather(*tasks)
 
                 # remove None items from list
                 vms = [ i for i in vms if i is not None ]
                 return vms
 
-        except Exception as err:
+        except Exception:
             logging.exception('Error while getting VM list from Proxmox')
             return False
 
-    async def get_vm_ip(self, session, vm):
+    async def get_vm_ip(self, session, node, vm):
         """get vms from proxmox server"""
         try:
             vmid = vm['vmid']
 
             # get nic info for vm
-            nic_info = await self.get_vm_nics(session, vmid)
+            nic_info = await self.get_vm_nics(session, node, vmid)
             ip_address = None
             if nic_info:
                 # get ip address from nic info
@@ -54,24 +58,24 @@ class Proxmox:
             # did we find the ip address, or should we predict it?
             if ip_address:
                 vm['ip_address'] = ip_address
-                logging.info(f"IP address for {vmid} is {vm['ip_address']}")
+                logging.info(f"IP address for {vmid} on {node} is {vm['ip_address']}")
             else:
                 if int(vmid) > 254:
-                    logging.info(f"Unable to lookup IP address for {vmid}. Not generating a predicted address because the ID ({vmid}) is greater than 254")
+                    logging.info(f"Unable to lookup IP address for {vmid} on {node}. Not generating a predicted address because the ID ({vmid}) is greater than 254")
                     return
                 else:
                     vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
-                    logging.info(f"Unable to lookup IP address for {vmid}. Using predicted address of {vm['ip_address']}")
+                    logging.info(f"Unable to lookup IP address for {vmid} on {node}. Using predicted address of {vm['ip_address']}")
 
             return vm
 
-        except Exception as err:
+        except Exception:
             logging.exception(f'Error while getting IP address for {vmid}')
             return False
 
-    async def get_vm_nics(self, session, vmid):
+    async def get_vm_nics(self, session, node, vmid):
         try:
-            async with session.get(f"{self.proxmox_url}/api2/json/nodes/{proxmox_node_name}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
+            async with session.get(f"{self.proxmox_url}/api2/json/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces", headers={"Authorization": self.proxmox_token}, verify_ssl=False) as r:
                 r.raise_for_status()
                 results = json.loads(await r.text())['data']['result']
 
@@ -80,7 +84,7 @@ class Proxmox:
 
                 return results
 
-        except Exception as ex:
+        except Exception:
             return False
 
     def get_ip_from_nics(self, nic_info):
@@ -217,8 +221,8 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
             tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])))
     await asyncio.gather(*tasks)
 
-async def pull_from_proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix):
-    proxmox = Proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix)
+async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix):
+    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix)
     return await proxmox.get_vms()
 
 
@@ -236,7 +240,7 @@ try:
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')
-    proxmox_node_name = config.get('proxmox', 'proxmox_node_name')
+    proxmox_nodes = [ node.strip() for node in config.get('proxmox', 'proxmox_nodes').split(',') if node.strip() != '' ]
     cloudflare_token = config.get('cloudflare', 'cloudflare_token')
     cloudflare_zone = config.get('cloudflare', 'cloudflare_zone')
     cloudflare_dns_subdomain = config.get('cloudflare', 'cloudflare_dns_subdomain', fallback=None)
@@ -247,7 +251,7 @@ except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
     exit()
 
-vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_node_name, proxmox_token_name, proxmox_token, ip_net_prefix))
+vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix))
 if vms:
     asyncio.run(sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms))
 else:

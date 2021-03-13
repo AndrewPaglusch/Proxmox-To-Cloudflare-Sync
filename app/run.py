@@ -153,7 +153,7 @@ class Cloudflare:
             logging.debug(f"Records lookup completed. Found {len(records)} total records")
             return records
         except Exception:
-            logging.exception(f"Failed to retreive records for zone {self.cloudflare_zone_name}")
+            logging.exception(f"Failed to retrieve records for zone {self.cloudflare_zone_name}")
 
     async def _get_records_page(self, session, page):
         """lookup records in zone on given page"""
@@ -168,7 +168,7 @@ class Cloudflare:
                 logging.debug(f"Records lookup completed for page {page} of {total_pages}. Found {len(records)} records")
                 return (total_pages, records)
         except Exception:
-            logging.exception(f"Failed to retreive records for zone {self.cloudflare_zone_name} (page {page})")
+            logging.exception(f"Failed to retrieve records for zone {self.cloudflare_zone_name} (page {page})")
 
     async def _create_record(self, session, record_name, ip_address):
         """create A record and return record id"""

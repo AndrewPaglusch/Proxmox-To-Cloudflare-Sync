@@ -2,12 +2,12 @@
 
 import sys
 import os
-import asyncio
-import aiohttp
 import json
 import logging
-import urllib3
 from configparser import ConfigParser
+import asyncio
+import aiohttp
+import urllib3
 
 
 class Proxmox:
@@ -63,9 +63,9 @@ class Proxmox:
                 if int(vmid) > 254:
                     logging.info(f"Unable to lookup IP address for {vmid} on {node}. Not generating a predicted address because the ID ({vmid}) is greater than 254")
                     return
-                else:
-                    vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
-                    logging.info(f"Unable to lookup IP address for {vmid} on {node}. Using predicted address of {vm['ip_address']}")
+
+                vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
+                logging.info(f"Unable to lookup IP address for {vmid} on {node}. Using predicted address of {vm['ip_address']}")
 
             return vm
 
@@ -246,10 +246,10 @@ try:
     cloudflare_dns_subdomain = config.get('cloudflare', 'cloudflare_dns_subdomain', fallback=None)
 except FileNotFoundError as err:
     logging.exception(f"Unable to read config file! Error: {err}")
-    exit()
+    sys.exit()
 except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
-    exit()
+    sys.exit()
 
 vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix))
 if vms:

@@ -1,7 +1,7 @@
 FROM python:3-alpine
 
 # Install dependencies
-RUN apk add --no-cache gettext
+RUN apk add --no-cache gettext gcc musl-dev libc-dev
 
 # Make a folder to run it in
 RUN mkdir /app

@@ -7,15 +7,16 @@ import aiohttp
 import json
 import logging
 import urllib3
+import ipaddress
 from configparser import ConfigParser
 
 
 class Proxmox:
-    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix):
+    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network):
         self.proxmox_url = proxmox_url
         self.proxmox_nodes = proxmox_nodes
         self.proxmox_token = f"PVEAPIToken={proxmox_token_name}={proxmox_token}"
-        self.ip_net_prefix = ip_net_prefix
+        self.network = ipaddress.IPv4Network(network)
 
     async def get_vms(self):
         """get vms from proxmox server"""
@@ -57,14 +58,14 @@ class Proxmox:
 
             # did we find the ip address, or should we predict it?
             if ip_address:
-                vm['ip_address'] = ip_address
+                vm['ip_address'] = str(ip_address)
                 logging.info(f"IP address for {vmid} on {node} is {vm['ip_address']}")
             else:
                 if int(vmid) > 254:
                     logging.info(f"Unable to lookup IP address for {vmid} on {node}. Not generating a predicted address because the ID ({vmid}) is greater than 254")
                     return
                 else:
-                    vm['ip_address'] = f"{self.ip_net_prefix}.{vmid}"
+                    vm['ip_address'] = str(self.network.network_address + int(vmid))
                     logging.info(f"Unable to lookup IP address for {vmid} on {node}. Using predicted address of {vm['ip_address']}")
 
             return vm
@@ -88,12 +89,14 @@ class Proxmox:
             return False
 
     def get_ip_from_nics(self, nic_info):
-        # look for ip address beginning with ip_net_prefix
+        # look for an ip address that is inside network
         if nic_info:
             for interface in nic_info:
-                for ip_address_type in interface["ip-addresses"]:
-                    if ip_net_prefix in ip_address_type['ip-address']:
-                        return ip_address_type['ip-address']
+                ip_addresses = [ipaddr['ip-address'] for ipaddr in interface["ip-addresses"] if ipaddr['ip-address-type'] == 'ipv4']
+                for ip_address in ip_addresses:
+                    ip_address = ipaddress.IPv4Address(ip_address)
+                    if ip_address in network:
+                        return ip_address
         return False
 
 
@@ -221,8 +224,8 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
             tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])))
     await asyncio.gather(*tasks)
 
-async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix):
-    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix)
+async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network):
+    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network)
     return await proxmox.get_vms()
 
 
@@ -236,7 +239,11 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 try:
     config = ConfigParser()
     config.read(os.path.join(os.path.dirname(__file__), 'config.ini'))
-    ip_net_prefix = config.get('main', 'ip_net_prefix')
+
+    network = ipaddress.IPv4Network(config.get('main', 'network'))
+    if network.num_addresses == 1:
+        raise ValueError("You must give a network in X.X.X.X/Y format")
+
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')
@@ -247,11 +254,14 @@ try:
 except FileNotFoundError as err:
     logging.exception(f"Unable to read config file! Error: {err}")
     exit()
+except ValueError as err:
+    logging.exception(f"Invalid IPv4 network given. Error: {err}")
+    exit()
 except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
     exit()
 
-vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, ip_net_prefix))
+vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network))
 if vms:
     asyncio.run(sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms))
 else:

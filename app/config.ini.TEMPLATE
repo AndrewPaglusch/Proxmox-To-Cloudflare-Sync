@@ -1,5 +1,5 @@
 [main]
-ip_net_prefix: ${IP_NET_PREFIX}
+network: ${NETWORK}
 
 [proxmox]
 proxmox_url: ${PROXMOX_URL}

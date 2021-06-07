@@ -1,5 +1,6 @@
 [main]
 ip_net_prefix: ${IP_NET_PREFIX}
+debug: ${DEBUG}
 
 [proxmox]
 proxmox_url: ${PROXMOX_URL}

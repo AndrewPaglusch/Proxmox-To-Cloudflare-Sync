@@ -124,7 +124,7 @@ class Cloudflare:
 
             self.zone_records = await self._get_records(session)
             if not self.zone_records:
-                return False
+                self.zone_records = {}
 
             return True
 

@@ -5,6 +5,7 @@ services:
     container_name: proxmox-cloudflare-sync
     restart: always
     environment:
+	  DEBUG: "false"
       NETWORK: 192.168.2.0/24
       PROXMOX_URL: https://proxmox-server:8006
       PROXMOX_NODES_LIST: pve01,pve02 #comma seperated

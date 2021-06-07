@@ -1,5 +1,6 @@
 [main]
 network: ${NETWORK}
+debug: ${DEBUG}
 
 [proxmox]
 proxmox_url: ${PROXMOX_URL}

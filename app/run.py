@@ -233,7 +233,13 @@ async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, prox
 urllib3.disable_warnings()
 
 # set up logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+def setupLogging():
+    debug = config.get('main', 'debug', fallback="false")
+    if debug.lower() == "true": 
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    else:
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 # load settings
 try:
@@ -244,6 +250,7 @@ try:
     if network.num_addresses == 1:
         raise ValueError("You must give a network in X.X.X.X/Y format")
 
+    setupLogging():
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')

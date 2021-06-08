@@ -234,7 +234,7 @@ urllib3.disable_warnings()
 
 # set up logging
 
-def setupLogging(debug):
+def setup_logging(debug):
     if debug.lower() == "true": 
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     else:
@@ -249,7 +249,7 @@ try:
     if network.num_addresses == 1:
         raise ValueError("You must give a network in X.X.X.X/Y format")
 
-    setupLogging(config.get('main', 'debug', fallback="false"))
+    setup_logging(config.get('main', 'debug', fallback="false"))
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')

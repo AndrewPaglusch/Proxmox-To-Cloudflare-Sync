@@ -223,7 +223,7 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
             tasks.append(asyncio.create_task(cf.update_record(f"{vm['name'}.{cloudflare_dns_subdomain}.{cloudflare_zone}", vm['ip_address'])))
         else:
             vm['name'] = vm['name'].replace(f".{cloudflare_zone}", '')
-            tasks.append(asyncio.create_task(cf.update_record(f"{vm['name'].replace('.' + cloudflare_zone, '')}.{cloudflare_zone}", vm['ip_address'])))
+            tasks.append(asyncio.create_task(cf.update_record(f"{vm['name'].{cloudflare_zone}", vm['ip_address'])))
     await asyncio.gather(*tasks)
 
 async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network):

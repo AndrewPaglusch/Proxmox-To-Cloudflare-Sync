@@ -141,9 +141,11 @@ class Cloudflare:
         async with aiohttp.ClientSession() as session:
             # do we need to update a record, or create a new one?
             if record_name in self.zone_records.keys():
+                logging.debug(f"Record found, updating {record_name} with {ip_address}")
                 if await self._update_record(session, record_name, self.zone_records[record_name]['record_id'], ip_address):
                     logging.info(f"Updated record for {record_name} ({ip_address})")
             else:
+                logging.debug(f"Record not found, creating {record_name} with {ip_address}")
                 if await self._create_record(session, record_name, ip_address):
                     logging.info(f"Created record for {record_name} ({ip_address})")
 
@@ -216,6 +218,7 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
 
     # return if we failed to get zone_id or records since everything will fail
     if not await cf.setup():
+        logging.debug(f"Failed to setup zone, unable to get records or session")
         return
 
     tasks = []

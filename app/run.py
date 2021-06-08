@@ -125,7 +125,7 @@ class Cloudflare:
 
             self.zone_records = await self._get_records(session)
             if not self.zone_records:
-                logging.warn(f"No records found. Is this an empty zone?")
+                logging.warn(f"No records found. This zone appears to be empty, trying to proceed.")
                 self.zone_records = {}
 
             return True

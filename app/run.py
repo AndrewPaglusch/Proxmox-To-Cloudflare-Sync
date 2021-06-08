@@ -120,11 +120,13 @@ class Cloudflare:
         async with aiohttp.ClientSession() as session:
             self.zone_id = await self._lookup_zone_id(session)
             if not self.zone_id:
+                logging.info(f"No zone id found")
                 return False
 
             self.zone_records = await self._get_records(session)
             if not self.zone_records:
-                return False
+                logging.warn(f"No records found. This zone appears to be empty, trying to proceed.")
+                self.zone_records = {}
 
             return True
 

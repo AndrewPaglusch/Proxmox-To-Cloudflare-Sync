@@ -119,11 +119,13 @@ class Cloudflare:
         """get zone_id and records for zone. must be called before you can call update_record"""
         async with aiohttp.ClientSession() as session:
             self.zone_id = await self._lookup_zone_id(session)
-            if not self.zone_id:
+            if len(self.zone_id) == 0:
+                logging.info(f"No zone id found")
                 return False
 
             self.zone_records = await self._get_records(session)
-            if not self.zone_records:
+            if len(self.zone_records) == 0:
+                logging.warn(f"No records found. Is this an empty zone?")
                 self.zone_records = {}
 
             return True

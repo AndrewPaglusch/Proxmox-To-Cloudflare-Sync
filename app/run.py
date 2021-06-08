@@ -131,7 +131,6 @@ class Cloudflare:
     async def update_record(self, record_name, ip_address):
         """update record with given ip address"""
         # see if the record is already in zone how we want it
-        logging.debug(f"Gathering info for {record_name}")
         if record_name in self.zone_records.keys():
             if self.zone_records[record_name]['ip_address'] == ip_address:
                 logging.info(f"Skipping update of {record_name}. It is already in desired state")

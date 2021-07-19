@@ -8,7 +8,6 @@ import json
 import logging
 import urllib3
 import ipaddress
-from pprint import pprint
 from configparser import ConfigParser
 
 

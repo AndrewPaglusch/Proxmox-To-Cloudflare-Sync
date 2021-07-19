@@ -8,6 +8,7 @@ import json
 import logging
 import urllib3
 import ipaddress
+from pprint import pprint
 from configparser import ConfigParser
 
 
@@ -103,7 +104,7 @@ class Proxmox:
     def _filter_vms(self, vms):
         """remove templates and other unneeded info from vm list"""
         # remove templates from list so we only have vms
-        no_templates = [d for d in vms if d['template'] != 1]
+        no_templates = [d for d in vms if d.get('template') != 1]
 
         # remove everything except name and vmid from each dict in list
         filtered = [{k:v for k,v in d.items() if k in ('name', 'vmid')} for d in no_templates]

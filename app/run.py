@@ -275,6 +275,7 @@ try:
       if net.num_addresses == 1:
           raise ValueError(f"You must give a network in X.X.X.X/Y format. Got {net}")
 
+    #TODO: Add predict_skip_vmids to config. Skip prediction of IP address for VM if it is in list
     predict_ip_addresses = config.get('main', 'predict_ip_addresses').lower() == "true"
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')

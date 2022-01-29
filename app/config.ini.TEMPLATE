@@ -1,5 +1,7 @@
 [main]
-network: ${NETWORK}
+valid_networks: ${VALID_NETWORKS}
+predict_network: ${PREDICT_NETWORK}
+predict_ip_addresses: ${PREDICT_IP_ADDRESSES}
 debug: ${DEBUG}
 
 [proxmox]

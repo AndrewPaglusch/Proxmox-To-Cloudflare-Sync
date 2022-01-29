@@ -12,11 +12,13 @@ from configparser import ConfigParser
 
 
 class Proxmox:
-    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network):
+    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses):
         self.proxmox_url = proxmox_url
         self.proxmox_nodes = proxmox_nodes
         self.proxmox_token = f"PVEAPIToken={proxmox_token_name}={proxmox_token}"
-        self.network = ipaddress.IPv4Network(network)
+        self.valid_networks = valid_networks
+        self.predict_network = predict_network
+        self.predict_ip_addresses = predict_ip_addresses
 
     async def get_vms(self):
         """get vms from proxmox server"""
@@ -61,11 +63,15 @@ class Proxmox:
                 vm['ip_address'] = str(ip_address)
                 logging.info(f"IP address for {vmid} on {node} is {vm['ip_address']}")
             else:
+                if not predict_ip_addresses:
+                    logging.info(f"Unable to lookup IP address for {vmid} on {node}. IP address prediction is disabled")
+                    return
+
                 if int(vmid) > 254:
                     logging.info(f"Unable to lookup IP address for {vmid} on {node}. Not generating a predicted address because the ID ({vmid}) is greater than 254")
                     return
                 else:
-                    vm['ip_address'] = str(self.network.network_address + int(vmid))
+                    vm['ip_address'] = str(self.predict_network.network_address + int(vmid))
                     logging.info(f"Unable to lookup IP address for {vmid} on {node}. Using predicted address of {vm['ip_address']}")
 
             return vm
@@ -92,11 +98,16 @@ class Proxmox:
         # look for an ip address that is inside network
         if nic_info:
             for interface in nic_info:
+                # skip interfaces that dont have ip addresses
+                if 'ip-addresses' not in interface.keys():
+                    logging.debug(f"Skipping over interface \"{interface['name']}\" because it does not have any IP addresses")
+                    continue
                 ip_addresses = [ipaddr['ip-address'] for ipaddr in interface["ip-addresses"] if ipaddr['ip-address-type'] == 'ipv4']
                 for ip_address in ip_addresses:
                     ip_address = ipaddress.IPv4Address(ip_address)
-                    if ip_address in network:
-                        return ip_address
+                    for n in valid_networks:
+                        if ip_address in n:
+                            return ip_address
         return False
 
 
@@ -231,8 +242,8 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
             tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])))
     await asyncio.gather(*tasks)
 
-async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network):
-    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network)
+async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses):
+    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses)
     return await proxmox.get_vms()
 
 
@@ -252,11 +263,19 @@ try:
     config = ConfigParser()
     config.read(os.path.join(os.path.dirname(__file__), 'config.ini'))
 
-    network = ipaddress.IPv4Network(config.get('main', 'network'))
-    if network.num_addresses == 1:
-        raise ValueError("You must give a network in X.X.X.X/Y format")
-
     setup_logging(config.get('main', 'debug', fallback="false"))
+
+    # network settings
+    predict_network = ipaddress.IPv4Network(config.get('main', 'predict_network'))
+    if predict_network.num_addresses == 1:
+      raise ValueError(f"You must give a network in X.X.X.X/Y format. Got {predict_network}")
+
+    valid_networks = [ ipaddress.IPv4Network(n.strip()) for n in config.get('main', 'valid_networks').split(',') ]
+    for net in valid_networks:
+      if net.num_addresses == 1:
+          raise ValueError(f"You must give a network in X.X.X.X/Y format. Got {net}")
+
+    predict_ip_addresses = config.get('main', 'predict_ip_addresses').lower() == "true"
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')
@@ -274,7 +293,7 @@ except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
     exit()
 
-vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, network))
+vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses))
 if vms:
     asyncio.run(sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms))
 else:

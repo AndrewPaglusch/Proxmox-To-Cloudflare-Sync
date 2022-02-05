@@ -12,13 +12,14 @@ from configparser import ConfigParser
 
 
 class Proxmox:
-    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses):
+    def __init__(self, proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses, predict_ip_addresses_vmid_blacklist):
         self.proxmox_url = proxmox_url
         self.proxmox_nodes = proxmox_nodes
         self.proxmox_token = f"PVEAPIToken={proxmox_token_name}={proxmox_token}"
         self.valid_networks = valid_networks
         self.predict_network = predict_network
         self.predict_ip_addresses = predict_ip_addresses
+        self.predict_ip_addresses_vmid_blacklist = predict_ip_addresses_vmid_blacklist
 
     async def get_vms(self):
         """get vms from proxmox server"""
@@ -65,6 +66,10 @@ class Proxmox:
             else:
                 if not predict_ip_addresses:
                     logging.info(f"Unable to lookup IP address for {vmid} on {node}. IP address prediction is disabled")
+                    return
+
+                if str(vmid) in predict_ip_addresses_vmid_blacklist:
+                    logging.info(f"Unable to lookup IP address for {vmid} on {node}. IP address prediction is disabled (VMID is blacklisted for prediction)")
                     return
 
                 if int(vmid) > 254:
@@ -242,8 +247,8 @@ async def sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_s
             tasks.append(asyncio.create_task(cf.update_record(f"{vm['name']}.{cloudflare_zone}", vm['ip_address'])))
     await asyncio.gather(*tasks)
 
-async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses):
-    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses)
+async def pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses, predict_ip_addresses_vmid_blacklist):
+    proxmox = Proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses, predict_ip_addresses_vmid_blacklist)
     return await proxmox.get_vms()
 
 
@@ -275,8 +280,8 @@ try:
       if net.num_addresses == 1:
           raise ValueError(f"You must give a network in X.X.X.X/Y format. Got {net}")
 
-    #TODO: Add predict_skip_vmids to config. Skip prediction of IP address for VM if it is in list
     predict_ip_addresses = config.get('main', 'predict_ip_addresses').lower() == "true"
+    predict_ip_addresses_vmid_blacklist = [ vmid.strip() for vmid in config.get('main', 'predict_ip_addresses_vmid_blacklist').split(',') ]
     proxmox_url = config.get('proxmox', 'proxmox_url')
     proxmox_token_name = config.get('proxmox', 'proxmox_token_name')
     proxmox_token = config.get('proxmox', 'proxmox_token')
@@ -294,7 +299,7 @@ except Exception as err:
     logging.exception("Unable to parse config.ini or missing settings! Error: {err}")
     exit()
 
-vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses))
+vms = asyncio.run(pull_from_proxmox(proxmox_url, proxmox_nodes, proxmox_token_name, proxmox_token, valid_networks, predict_network, predict_ip_addresses, predict_ip_addresses_vmid_blacklist))
 if vms:
     asyncio.run(sync_to_cloudflare(cloudflare_token, cloudflare_zone, cloudflare_dns_subdomain, vms))
 else:

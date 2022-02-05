@@ -2,6 +2,7 @@
 valid_networks: ${VALID_NETWORKS}
 predict_network: ${PREDICT_NETWORK}
 predict_ip_addresses: ${PREDICT_IP_ADDRESSES}
+predict_ip_addresses_vmid_blacklist: ${PREDICT_IP_ADDRESSES_VMID_BLACKLIST}
 debug: ${DEBUG}
 
 [proxmox]
@@ -14,4 +15,3 @@ proxmox_token: ${PROXMOX_TOKEN}
 cloudflare_token: ${CLOUDFLARE_TOKEN}
 cloudflare_zone: ${CLOUDFLARE_ZONE}
 cloudflare_dns_subdomain: ${CLOUDFLARE_DNS_SUBDOMAIN}
-

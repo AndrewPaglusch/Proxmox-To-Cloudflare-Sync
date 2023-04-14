@@ -1,6 +1,6 @@
 # Proxmox Cloudflare Sync
 
-This application queries your Proxmox node(s) to retrieve a list of all VMs. It attempts to determine each VM's IP address and subsequently updates the corresponding A records on Cloudflare. If the VM's IP address cannot be discovered, the application generates a predicted IP address based on the VM's VMID, using it as the last octet of an IP address within the specified NETWORK range. This predicted IP address is then used to create or update the A record on Cloudflare, ensuring that the DNS records remain up-to-date even when the IP address of a VM cannot be directly determined.
+This application queries your Proxmox node(s) to retrieve a list of all VMs. It attempts to determine each VM's IP address and subsequently updates the corresponding A records on Cloudflare. If the VM's IP address cannot be discovered, the application generates a predicted IP address based on the VM's VMID, using it as the last octet of an IP address within the specified `NETWORK` range. This predicted IP address is then used to create or update the A record on Cloudflare, ensuring that the DNS records remain up-to-date even when the IP address of a VM cannot be directly determined.
 
 This tool is perfect for users who manage dynamic Proxmox VM environments and want to keep their Cloudflare DNS records current with minimal manual effort.
 

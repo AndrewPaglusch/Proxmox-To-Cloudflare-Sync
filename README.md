@@ -13,7 +13,7 @@ This tool is perfect for users who manage dynamic Proxmox VM environments and wa
 ## Environment Variables
 
 - `DEBUG`: Set to "true" to enable debug logging. Default is "false".
-- `NETWORK`: The network range (CIDR notation) within which the VMs' IP addresses are expected to be discovered, e.g., `192.168.2.0/24`. Any dicovered IP addresses that are outside of this range are ignored. This is also the network used when a predicted IP address must be created for a VM.
+- `NETWORK`: The network range (CIDR notation) within which the VMs' IP addresses are expected to be discovered, e.g., `192.168.2.0/24`. Any discovered IP addresses that are outside of this range are ignored. This is also the network used when a predicted IP address must be created for a VM.
 - `PROXMOX_URL`: The URL of your Proxmox server, e.g., `https://proxmox-server:8006`.
 - `PROXMOX_NODES_LIST`: A comma-separated list of Proxmox node names, e.g., `pve01,pve02`.
 - `PROXMOX_TOKEN_NAME`: The name of the Proxmox API token, e.g., `api-user@pam!main`.

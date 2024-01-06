@@ -1,4 +1,4 @@
-FROM python:3-alpine
+FROM python:3.11-alpine
 
 # Install dependencies
 RUN apk add --no-cache gettext gcc musl-dev libc-dev
